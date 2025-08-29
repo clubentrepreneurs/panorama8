@@ -10,8 +10,6 @@
             overflow: hidden;
             height: 100%;
             touch-action: none;
-
-            /* === Papier peint === */
             background: url("backgroundstatique.png") no-repeat center center fixed;
             background-size: cover; 
         }
@@ -22,7 +20,7 @@
             touch-action: none;
             background-color: transparent !important;
         }
-        
+
         /* === Cercles animés === */
         .circleContainer {
             position: absolute;
@@ -66,7 +64,7 @@
             0% { transform: scale(0); opacity: 0.7; }
             100% { transform: scale(1.5); opacity: 0; }
         }
-        
+
         /* === Vidéo responsive === */
         #videoContainer {
             position: absolute;
@@ -105,6 +103,8 @@
             justify-content: center;
             align-items: center;
             flex-direction: column;
+            color: white;
+            font-family: sans-serif;
         }
         #skipButton {
             margin-top: 20px;
@@ -127,7 +127,9 @@
 <body>
     <!-- Intro -->
     <div id="introAnimation">
-        <div id="lottieContainer" style="width:80%; max-width:800px; height:80%;"></div>
+        <div id="lottieContainer" style="width:80%; max-width:800px; height:80%; display:flex; align-items:center; justify-content:center;">
+            <span id="loadingText">Loading...</span>
+        </div>
         <button id="skipButton">Skip intro</button>
     </div>
 
@@ -145,40 +147,69 @@
         // === Animation d'intro Lottie ===
         const introContainer = document.getElementById("introAnimation");
         const skipButton = document.getElementById("skipButton");
+        const loadingText = document.getElementById("loadingText");
+
+        let lottieReady = false;
 
         const anim = lottie.loadAnimation({
             container: document.getElementById("lottieContainer"),
             renderer: "svg",
             loop: false,
-            autoplay: true,
-            path: "panorama4.json" // fichier exporté Bodymovin
+            autoplay: false,
+            path: "panorama4.json"
         });
 
-        // Fonction pour cacher l’intro
-        function hideIntro() {
+        anim.addEventListener("DOMLoaded", () => {
+            loadingText.style.display = "none";
+            lottieReady = true;
+            anim.play();
+        });
+
+        // Fonction pour lancer la scène Babylon
+        function startScene() {
             introContainer.style.display = "none";
+            if (!engine.isRendering) {
+                engine.runRenderLoop(() => {
+                    scene.render();
+                    circleMap.forEach((circle, mesh) => {
+                        if (!mesh) return;
+                        const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
+                        const pos = BABYLON.Vector3.Project(
+                            worldCenter,
+                            BABYLON.Matrix.IdentityReadOnly,
+                            scene.getTransformMatrix(),
+                            camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
+                        );
+
+                        if (pos.z >= 0 && pos.z <= 1) {
+                            circle.style.left = `${pos.x}px`;
+                            circle.style.top = `${pos.y}px`;
+                            circle.style.transform = "translate(-50%, -50%)";
+                            circle.style.visibility = "visible";
+                        } else {
+                            circle.style.visibility = "hidden";
+                        }
+                    });
+                });
+            }
         }
 
-        anim.addEventListener("complete", hideIntro);
-        skipButton.addEventListener("click", hideIntro);
+        anim.addEventListener("complete", startScene);
+        skipButton.addEventListener("click", startScene);
 
         // === Babylon.js Scene ===
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: true });
         const scene = new BABYLON.Scene(engine);
 
-        // Fond transparent
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
-        // Caméra
         const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/2.5, 300, new BABYLON.Vector3(0,0,0), scene);
         camera.attachControl(canvas, true);
 
-        // Lumière
         new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0,1,0), scene);
 
-        // Dôme
-        const dome = new BABYLON.PhotoDome("panorama", "test6.png", { resolution: 32, size: 1000 }, scene);
+        const dome = new BABYLON.PhotoDome("panorama", "test5.png", { resolution: 32, size: 1000 }, scene);
         dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;
 
         const domeMat = dome.mesh.material;
@@ -188,7 +219,6 @@
         domeMat.backFaceCulling = false;
         domeMat.needDepthPrePass = true;
 
-        // Cercles + GLB
         const circleMap = new Map();
         function createCircle(id) {
             const container = document.createElement("div");
@@ -254,29 +284,6 @@
             videoPlayer.src = "";
             videoContainer.style.display = "none";
             camera.attachControl(canvas, true);
-        });
-
-        engine.runRenderLoop(() => {
-            scene.render();
-            circleMap.forEach((circle, mesh) => {
-                if (!mesh) return;
-                const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
-                const pos = BABYLON.Vector3.Project(
-                    worldCenter,
-                    BABYLON.Matrix.IdentityReadOnly,
-                    scene.getTransformMatrix(),
-                    camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
-                );
-
-                if (pos.z >= 0 && pos.z <= 1) {
-                    circle.style.left = `${pos.x}px`;
-                    circle.style.top = `${pos.y}px`;
-                    circle.style.transform = "translate(-50%, -50%)";
-                    circle.style.visibility = "visible";
-                } else {
-                    circle.style.visibility = "hidden";
-                }
-            });
         });
 
         window.addEventListener("resize", () => engine.resize());
