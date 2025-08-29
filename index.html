@@ -13,7 +13,7 @@
 
       /* === Papier peint === */
       background: url("backgroundstatique.png") no-repeat center center fixed;
-      background-size: cover; 
+      background-size: cover;
     }
     #renderCanvas {
       width: 100%;
@@ -34,6 +34,7 @@
       align-items: center;
       cursor: pointer;
       pointer-events: auto;
+      flex-direction: column;
     }
     .circle {
       position: absolute;
@@ -68,14 +69,16 @@
     }
 
     /* === Overlay texte === */
-    .labelOverlay {
-      position: absolute;
+    .label {
+      position: relative;
+      margin-top: 45px;
+      background: rgba(0,0,0,0.6);
       color: white;
-      font-size: 16px;
-      font-family: sans-serif;
-      text-shadow: 1px 1px 3px black;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 14px;
+      white-space: nowrap;
       pointer-events: none;
-      z-index: 25;
     }
 
     /* === Vidéo responsive === */
@@ -121,7 +124,7 @@
     const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: true });
     const scene = new BABYLON.Scene(engine);
 
-    // Fond transparent
+    // Fond transparent pour voir le background CSS
     scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
     // === Caméra ===
@@ -134,7 +137,6 @@
     // === Dôme transparent ===
     const dome = new BABYLON.PhotoDome("panorama", "test5.png", { resolution: 32, size: 1000 }, scene);
     dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;
-
     const domeMat = dome.mesh.material;
     domeMat.diffuseTexture.hasAlpha = true;
     domeMat.useAlphaFromDiffuseTexture = true;
@@ -144,16 +146,17 @@
 
     // === Cercles + GLB ===
     const circleMap = new Map();
-    function createCircle(id) {
+    function createCircle(id, labelText) {
       const container = document.createElement("div");
       container.id = "circle_" + id;
       container.classList.add("circleContainer");
-      container.innerHTML = '<div class="circle"></div>';
+      container.innerHTML = `<div class="circle"></div><div class="label">${labelText}</div>`;
       document.body.appendChild(container);
       return container;
     }
 
     const glbFiles = ["agenda.glb", "2.glb", "3.glb", "4.glb"];
+    const labels = ["Agenda", "Objet 2", "Objet 3", "Objet 4"];
     const videoUrls = [
       "https://www.youtube.com/watch?v=lUU1G-6klpI",
       "https://www.youtube.com/watch?v=SWIDVGO3Gg0",
@@ -182,14 +185,29 @@
         const realMeshes = meshes.filter(m => m.getTotalVertices() > 0);
         if (realMeshes.length === 0) return;
 
-        // Si squelette → lancer animation
+        const mesh = realMeshes[0];
+
+        // === Si squelette → lancer animation
         if (skeletons && skeletons.length > 0) {
           scene.beginAnimation(skeletons[0], 0, 100000, true);
         }
 
-        const mesh = realMeshes[0];
-        mesh.scaling = new BABYLON.Vector3(50, 50, 50); // ajuste selon ton modèle
+        // === RECENTRAGE du pivot ===
+        const bbox = mesh.getBoundingInfo().boundingBox;
+        const center = bbox.center.negate();
+        mesh.position.addInPlace(center);
 
+        // === ORIENTATION (ici rotation Y générique, ajuste si besoin par modèle)
+        mesh.rotationQuaternion = null;
+        mesh.rotation = new BABYLON.Vector3(0, 0, 0);
+
+        // === SCALING auto pour uniformiser taille ===
+        const maxDim = bbox.maximumWorld.subtract(bbox.minimumWorld).length();
+        const targetSize = 50;
+        const scale = targetSize / maxDim;
+        mesh.scaling = new BABYLON.Vector3(scale, scale, scale);
+
+        // === Position sur le cercle ===
         const pivot = new BABYLON.TransformNode("pivot_" + index, scene);
         mesh.position.z = radius;
         if (customAngles[index] !== undefined) {
@@ -197,16 +215,9 @@
         }
         mesh.parent = pivot;
 
-        // Cercle
-        const circle = createCircle(index + 1);
-
-        // Label texte
-        const label = document.createElement("div");
-        label.className = "labelOverlay";
-        label.textContent = "Objet " + (index + 1);
-        document.body.appendChild(label);
-
-        circleMap.set(mesh, { circle, label });
+        // cercle + label
+        const circle = createCircle(index + 1, labels[index]);
+        circleMap.set(mesh, circle);
 
         circle.addEventListener('click', () => {
           const embedUrl = getEmbedUrl(videoUrls[index]);
@@ -225,7 +236,7 @@
 
     engine.runRenderLoop(() => {
       scene.render();
-      circleMap.forEach((obj, mesh) => {
+      circleMap.forEach((circle, mesh) => {
         if (!mesh) return;
         const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
         const pos = BABYLON.Vector3.Project(
@@ -236,18 +247,12 @@
         );
 
         if (pos.z >= 0 && pos.z <= 1) {
-          obj.circle.style.left = `${pos.x}px`;
-          obj.circle.style.top = `${pos.y}px`;
-          obj.circle.style.transform = "translate(-50%, -50%)";
-          obj.circle.style.visibility = "visible";
-
-          obj.label.style.left = `${pos.x}px`;
-          obj.label.style.top = `${pos.y + 40}px`; // texte sous le cercle
-          obj.label.style.transform = "translate(-50%, -50%)";
-          obj.label.style.visibility = "visible";
+          circle.style.left = `${pos.x}px`;
+          circle.style.top = `${pos.y}px`;
+          circle.style.transform = "translate(-50%, -50%)";
+          circle.style.visibility = "visible";
         } else {
-          obj.circle.style.visibility = "hidden";
-          obj.label.style.visibility = "hidden";
+          circle.style.visibility = "hidden";
         }
       });
     });
