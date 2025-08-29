@@ -10,8 +10,17 @@
             overflow: hidden;
             height: 100%;
             touch-action: none;
+
+            /* === Papier peint (choisir la variante ci-dessous) === */
+
+            /* Variante 1 : COVER (plein écran, peut rogner un peu) */
             background: url("backgroundstatique.png") no-repeat center center fixed;
             background-size: cover;
+
+            /* Variante 2 : CONTAIN (toujours entière, bandes possibles) */
+            /* background: url("backgroundstatique.png") no-repeat center center fixed;
+            background-size: contain;
+            background-color: black; /* couleur des bandes autour */
         }
         #renderCanvas {
             width: 100%;
@@ -20,29 +29,31 @@
             touch-action: none;
             background-color: transparent !important;
         }
-        
+
         /* === Cercles animés === */
         .circleContainer {
             position: absolute;
-            width: 40px;
-            height: 40px;
+            width: 40px; /* Largeur du conteneur pour le cercle */
+            height: 40px; /* Hauteur du conteneur pour le cercle */
             z-index: 20;
             display: flex;
+            flex-direction: column; /* Pour empiler le cercle et le texte */
             justify-content: center;
             align-items: center;
             cursor: pointer;
             pointer-events: auto;
+            /* Le transform: translate(-50%, -50%) sera appliqué au conteneur principal par JS */
         }
         .circle {
-            position: absolute;
-            top: 50%;
-            left: 50%;
+            position: absolute; /* Positionné par rapport au .circleContainer */
+            top: 0; /* Alignement en haut du conteneur */
+            left: 0; /* Alignement à gauche du conteneur */
             width: 100%;
             height: 100%;
             border-radius: 50%;
-            transform: translate(-50%, -50%);
             border: 2px solid red;
             animation: pulse 2s infinite ease-in-out;
+            /* Pas de translate ici car le conteneur gère la position principale */
         }
         .circle::after {
             content: "";
@@ -64,7 +75,24 @@
             0% { transform: scale(0); opacity: 0.7; }
             100% { transform: scale(1.5); opacity: 0; }
         }
-        
+
+        /* === Texte overlay sous le GLB === */
+        .text-overlay {
+            position: absolute;
+            top: 100%; /* Positionne le texte juste en dessous du conteneur du cercle */
+            left: 50%;
+            transform: translateX(-50%); /* Centre le texte horizontalement */
+            color: black; /* Texte en noir */
+            background-color: rgba(255, 255, 255, 0.7); /* Fond légèrement transparent pour la lisibilité */
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-family: sans-serif;
+            font-size: 12px;
+            white-space: nowrap; /* Empêche le texte de s'enrouler */
+            pointer-events: none; /* Permet de cliquer à travers le texte si nécessaire */
+            margin-top: 5px; /* Espacement entre le cercle et le texte */
+        }
+
         /* === Vidéo responsive === */
         #videoContainer {
             position: absolute;
@@ -131,11 +159,12 @@
 
         // === Cercles + GLB ===
         const circleMap = new Map();
-        function createCircle(id) {
+        // Fonction createCircle mise à jour pour inclure le texte
+        function createCircle(id, text) {
             const container = document.createElement("div");
             container.id = "circle_" + id;
             container.classList.add("circleContainer");
-            container.innerHTML = `<div class="circle"></div>`;
+            container.innerHTML = `<div class="circle"></div><div class="text-overlay">${text}</div>`; // Ajout du text-overlay
             document.body.appendChild(container);
             return container;
         }
@@ -165,13 +194,16 @@
         }
 
         glbFiles.forEach((file, index) => {
-            // AJOUT : on récupère les animationGroups dans le callback
             BABYLON.SceneLoader.ImportMesh("", "./", file, scene, function(meshes, particleSystems, skeletons, animationGroups) {
                 // Utilisez le premier mesh qui est la racine pour la position/rotation
-                const mesh = meshes[0]; 
-                
-                // === AJOUT POUR GÉRER LES ANIMATIONS ===
-                // Parcourez tous les groupes d'animation et lancez-les
+                // Assurez-vous que le modèle a au moins un mesh
+                if (!meshes || meshes.length === 0) {
+                    console.warn(`Aucun mesh trouvé dans ${file}.`);
+                    return;
+                }
+                const mesh = meshes[0];
+
+                // Lance toutes les animations trouvées dans le GLB
                 if (animationGroups) {
                     animationGroups.forEach(ag => ag.start(true)); // Le "true" lance en boucle
                 }
@@ -185,7 +217,8 @@
                 }
                 mesh.parent = pivot;
 
-                const circle = createCircle(index + 1);
+                // Création du cercle et du texte overlay, en passant le nom du fichier comme texte
+                const circle = createCircle(index + 1, file);
                 circleMap.set(mesh, circle);
 
                 circle.addEventListener('click', () => {
@@ -206,7 +239,12 @@
         engine.runRenderLoop(() => {
             scene.render();
             circleMap.forEach((circle, mesh) => {
-                if (!mesh) return;
+                if (!mesh) return; // S'assurer que le mesh existe
+
+                // Calcule la position 2D du centre du mesh sur l'écran
+                // Note : Pour un placement plus précis sous le GLB, vous pourriez ajuster
+                // la position verticale en fonction de la taille du mesh,
+                // mais worldCenter est un bon point de départ.
                 const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
                 const pos = BABYLON.Vector3.Project(
                     worldCenter,
@@ -215,10 +253,11 @@
                     camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
                 );
 
+                // Si le GLB est visible à l'écran
                 if (pos.z >= 0 && pos.z <= 1) {
                     circle.style.left = `${pos.x}px`;
                     circle.style.top = `${pos.y}px`;
-                    circle.style.transform = "translate(-50%, -50%)";
+                    circle.style.transform = "translate(-50%, -50%)"; // Centre le conteneur sur le point calculé
                     circle.style.visibility = "visible";
                 } else {
                     circle.style.visibility = "hidden";
