@@ -10,9 +10,12 @@
             overflow: hidden;
             height: 100%;
             touch-action: none;
+
+            /* === Papier peint === */
             background: url("backgroundstatique.png") no-repeat center center fixed;
-            background-size: cover; 
+            background-size: cover;
         }
+
         #renderCanvas {
             width: 100%;
             height: 100%;
@@ -32,6 +35,7 @@
             align-items: center;
             cursor: pointer;
             pointer-events: auto;
+            transform: translate(-50%, -50%);
         }
         .circle {
             position: absolute;
@@ -65,6 +69,20 @@
             100% { transform: scale(1.5); opacity: 0; }
         }
 
+        /* === Texte des labels === */
+        .label {
+            position: absolute;
+            top: 100%; /* sous le cercle */
+            left: 50%;
+            transform: translate(-50%, 10px);
+            white-space: nowrap;
+            font-size: 14px;
+            font-family: Arial, sans-serif;
+            color: white;
+            text-shadow: 0 0 5px black;
+            pointer-events: none;
+        }
+
         /* === Vidéo responsive === */
         #videoContainer {
             position: absolute;
@@ -91,49 +109,9 @@
             font-size: 16px;
             z-index: 101;
         }
-
-        /* === Intro Lottie === */
-        #introAnimation {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: black;
-            z-index: 9999;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: white;
-            font-family: sans-serif;
-        }
-        #skipButton {
-            margin-top: 20px;
-            padding: 10px 20px;
-            border: none;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            font-size: 18px;
-            cursor: pointer;
-            border-radius: 8px;
-        }
-        #skipButton:hover {
-            background: rgba(255, 255, 255, 0.4);
-        }
     </style>
-
-    <!-- Lottie -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.9.6/lottie.min.js"></script>
 </head>
 <body>
-    <!-- Intro -->
-    <div id="introAnimation">
-        <div id="lottieContainer" style="width:80%; max-width:800px; height:80%; display:flex; align-items:center; justify-content:center;">
-            <span id="loadingText">Loading...</span>
-        </div>
-        <button id="skipButton">Skip intro</button>
-    </div>
-
-    <!-- Scene Babylon -->
     <canvas id="renderCanvas"></canvas>
 
     <div id="videoContainer">
@@ -144,71 +122,21 @@
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script>
-        // === Animation d'intro Lottie ===
-        const introContainer = document.getElementById("introAnimation");
-        const skipButton = document.getElementById("skipButton");
-        const loadingText = document.getElementById("loadingText");
-
-        let lottieReady = false;
-
-        const anim = lottie.loadAnimation({
-            container: document.getElementById("lottieContainer"),
-            renderer: "svg",
-            loop: false,
-            autoplay: false,
-            path: "panorama4.json"
-        });
-
-        anim.addEventListener("DOMLoaded", () => {
-            loadingText.style.display = "none";
-            lottieReady = true;
-            anim.play();
-        });
-
-        // Fonction pour lancer la scène Babylon
-        function startScene() {
-            introContainer.style.display = "none";
-            if (!engine.isRendering) {
-                engine.runRenderLoop(() => {
-                    scene.render();
-                    circleMap.forEach((circle, mesh) => {
-                        if (!mesh) return;
-                        const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
-                        const pos = BABYLON.Vector3.Project(
-                            worldCenter,
-                            BABYLON.Matrix.IdentityReadOnly,
-                            scene.getTransformMatrix(),
-                            camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
-                        );
-
-                        if (pos.z >= 0 && pos.z <= 1) {
-                            circle.style.left = `${pos.x}px`;
-                            circle.style.top = `${pos.y}px`;
-                            circle.style.transform = "translate(-50%, -50%)";
-                            circle.style.visibility = "visible";
-                        } else {
-                            circle.style.visibility = "hidden";
-                        }
-                    });
-                });
-            }
-        }
-
-        anim.addEventListener("complete", startScene);
-        skipButton.addEventListener("click", startScene);
-
-        // === Babylon.js Scene ===
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: true });
         const scene = new BABYLON.Scene(engine);
 
+        // Fond transparent
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
+        // Caméra
         const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/2.5, 300, new BABYLON.Vector3(0,0,0), scene);
         camera.attachControl(canvas, true);
 
+        // Lumière
         new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0,1,0), scene);
 
+        // Dôme transparent
         const dome = new BABYLON.PhotoDome("panorama", "test5.png", { resolution: 32, size: 1000 }, scene);
         dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;
 
@@ -219,17 +147,23 @@
         domeMat.backFaceCulling = false;
         domeMat.needDepthPrePass = true;
 
+        // === Cercles + GLB + Labels ===
         const circleMap = new Map();
-        function createCircle(id) {
+
+        function createCircleWithLabel(id, labelText) {
             const container = document.createElement("div");
             container.id = "circle_" + id;
             container.classList.add("circleContainer");
-            container.innerHTML = `<div class="circle"></div>`;
+            container.innerHTML = `
+                <div class="circle"></div>
+                <div class="label">${labelText}</div>
+            `;
             document.body.appendChild(container);
             return container;
         }
 
         const glbFiles = ["1.glb", "2.glb", "3.glb", "4.glb"];
+        const labels = ["Objet 1", "Objet 2", "Objet 3", "Objet 4"];
         const videoUrls = [
             "https://www.youtube.com/watch?v=lUU1G-6klpI",
             "https://www.youtube.com/watch?v=SWIDVGO3Gg0",
@@ -268,7 +202,7 @@
                 }
                 mesh.parent = pivot;
 
-                const circle = createCircle(index + 1);
+                const circle = createCircleWithLabel(index + 1, labels[index]);
                 circleMap.set(mesh, circle);
 
                 circle.addEventListener('click', () => {
@@ -284,6 +218,28 @@
             videoPlayer.src = "";
             videoContainer.style.display = "none";
             camera.attachControl(canvas, true);
+        });
+
+        engine.runRenderLoop(() => {
+            scene.render();
+            circleMap.forEach((circle, mesh) => {
+                if (!mesh) return;
+                const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
+                const pos = BABYLON.Vector3.Project(
+                    worldCenter,
+                    BABYLON.Matrix.IdentityReadOnly,
+                    scene.getTransformMatrix(),
+                    camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
+                );
+
+                if (pos.z >= 0 && pos.z <= 1) {
+                    circle.style.left = `${pos.x}px`;
+                    circle.style.top = `${pos.y}px`;
+                    circle.style.visibility = "visible";
+                } else {
+                    circle.style.visibility = "hidden";
+                }
+            });
         });
 
         window.addEventListener("resize", () => engine.resize());
