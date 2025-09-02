@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <title>GLB + cercles + panorama + menu</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <link href="https://fonts.cdnfonts.com/css/apex-new" rel="stylesheet">
     <style>
         html, body {
             margin: 0;
             overflow: hidden;
             height: 100%;
             touch-action: none;
-            background: url("backgroundstatique.png") no-repeat center center fixed;
-            background-size: cover;
+            background: none;
         }
         #renderCanvas {
             width: 100%;
@@ -21,12 +21,54 @@
             background-color: transparent !important;
         }
 
+        /* === Texte stylisé avec effet bounce === */
+        #customText {
+            position: absolute;
+            bottom: 5vh;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Apex New', sans-serif;
+            font-size: clamp(24px, 4vw, 48px);
+            font-weight: heavy;
+            text-align: center;
+            color: black;
+            z-index: 2000;
+            line-height: 1.2;
+            background-color: transparent;
+            padding: 1em 2em;
+            border-radius: 0;
+            max-width: 90vw;
+            word-wrap: break-word;
+            cursor: pointer;
+            transition: font-size 0.3s ease-in-out;
+        }
+        #customText.zoomed {
+            font-size: clamp(36px, 6vw, 72px);
+            transform: translateX(-50%) scale(1.1);
+        }
+        @keyframes bounceIn {
+            0% {
+                opacity: 0;
+                transform: translate(-50%, -200%) scale(0.3);
+            }
+            60% {
+                opacity: 1;
+                transform: translate(-50%, 20%) scale(1.05);
+            }
+            80% {
+                transform: translate(-50%, -10%) scale(0.95);
+            }
+            100% {
+                transform: translate(-50%, 0) scale(1);
+            }
+        }
+
         /* === Styles pour le menu Hamburger === */
         #menu-container {
             position: fixed;
             top: 20px;
             left: 20px;
-            z-index: 1001; /* Au-dessus de tous les autres éléments */
+            z-index: 1001;
         }
         #hamburger-button {
             width: 30px;
@@ -57,31 +99,13 @@
             transition: transform 0.3s ease-in-out;
             padding: 60px 20px 20px;
             box-shadow: 2px 0 5px rgba(0,0,0,0.5);
-            font-family: sans-serif;
+            font-family: 'Apex New', sans-serif;
             box-sizing: border-box;
         }
         #menu-overlay.open {
             transform: translateX(0);
         }
-        #menu-overlay h2 {
-            margin-top: 0;
-            color: #333;
-        }
-        #menu-overlay ul {
-            list-style: none;
-            padding: 0;
-        }
-        #menu-overlay li {
-            padding: 10px 0;
-            border-bottom: 1px solid #ddd;
-        }
-        #menu-overlay a {
-            text-decoration: none;
-            color: #555;
-            font-size: 16px;
-            display: block;
-        }
-        
+
         /* === Cercles animés === */
         .circleContainer {
             position: absolute;
@@ -125,8 +149,8 @@
             0% { transform: scale(0); opacity: 0.7; }
             100% { transform: scale(1.5); opacity: 0; }
         }
-        
-        /* === Texte overlay sous le GLB === */
+
+        /* === Texte overlay des GLB === */
         .text-overlay {
             position: absolute;
             top: 100%;
@@ -174,6 +198,11 @@
 <body>
     <canvas id="renderCanvas"></canvas>
 
+    <div id="customText">
+        REUSSIR A L'UNIVERSITE<br>
+        Toutes les vidéos
+    </div>
+
     <div id="menu-container">
         <button id="hamburger-button">
             <span class="line"></span>
@@ -184,9 +213,9 @@
     <div id="menu-overlay">
         <h2>Menu</h2>
         <ul>
-            <li><a href="#">Élément 1</a></li>
-            <li><a href="#">Élément 2</a></li>
-            <li><a href="#">Élément 3</a></li>
+            <li><a href="https://www.youtube.com/watch?v=Jgcb7hjdgaU">Vidéo "Bienvenue à UniCA"</a></li>
+            <li><a href="https://www.youtube.com/watch?v=lUU1G-6klpI">Vidéo "Compte Sésame"</a></li>
+            <li><a href="https://www.youtube.com/watch?v=SWIDVGO3Gg0">Vidéo "Intranet étudiant"</a></li>
         </ul>
     </div>
     
@@ -201,29 +230,46 @@
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: true });
         const scene = new BABYLON.Scene(engine);
-
-        // Fond transparent pour voir backgroundstatique.png (CSS)
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
-        // === Caméra ===
         const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/2.5, 300, new BABYLON.Vector3(0,0,0), scene);
         camera.attachControl(canvas, true);
 
-        // === Lumière ===
         new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0,1,0), scene);
 
-        // === Dôme transparent ===
-        const dome = new BABYLON.PhotoDome("panorama", "test6.png", { resolution: 32, size: 1000 }, scene);
-        dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;
+        // === Support WebP + fallback + gestion PNG/JPG ===
+        function supportsWebP(callback) {
+            const img = new Image();
+            img.onload = () => callback(img.width > 0 && img.height > 0);
+            img.onerror = () => callback(false);
+            img.src = "data:image/webp;base64,UklGRiIAAABXRUJQVlA4TCEAAAAvAAAAAA...";
+        }
 
-        const domeMat = dome.mesh.material;
-        domeMat.diffuseTexture.hasAlpha = true;
-        domeMat.useAlphaFromDiffuseTexture = true;
-        domeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
-        domeMat.backFaceCulling = false;
-        domeMat.needDepthPrePass = true;
+        function createPhotoDome(panoFile) {
+            const dome = new BABYLON.PhotoDome("panorama", panoFile + "?v=" + Date.now(), { resolution: 32, size: 1000 }, scene);
+            dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;
 
-        // === Cercles + GLB ===
+            const domeMat = dome.mesh.material;
+
+            if (panoFile.endsWith(".jpg") || panoFile.endsWith(".jpeg")) {
+                domeMat.diffuseTexture.hasAlpha = false;
+                domeMat.useAlphaFromDiffuseTexture = false;
+                domeMat.transparencyMode = BABYLON.Material.MATERIAL_OPAQUE;
+            } else {
+                domeMat.diffuseTexture.hasAlpha = true;
+                domeMat.useAlphaFromDiffuseTexture = true;
+                domeMat.transparencyMode = BABYLON.Material.MATERIAL_ALPHABLEND;
+                domeMat.backFaceCulling = false;
+                domeMat.needDepthPrePass = true;
+            }
+        }
+
+        // Choisis ton fichier de base ici
+        supportsWebP((isSupported) => {
+            const panoFile = isSupported ? "test7.webp" : "backgroundstatiqueexportepourleweb.png"; 
+            createPhotoDome(panoFile);
+        });
+
         const circleMap = new Map();
         function createCircle(id, text) {
             const container = document.createElement("div");
@@ -265,12 +311,10 @@
                     return;
                 }
                 const mesh = meshes[0];
-
                 if (animationGroups) {
                     animationGroups.forEach(ag => ag.start(true));
                 }
-
-                mesh.scaling = new BABYLON.Vector3(20, 20, 20);
+                mesh.scaling = new BABYLON.Vector3(50, 50, 50);
 
                 const pivot = new BABYLON.TransformNode("pivot_" + index, scene);
                 mesh.position.z = radius;
@@ -301,7 +345,6 @@
             scene.render();
             circleMap.forEach((circle, mesh) => {
                 if (!mesh) return;
-
                 const worldCenter = mesh.getBoundingInfo().boundingSphere.centerWorld;
                 const pos = BABYLON.Vector3.Project(
                     worldCenter,
@@ -309,7 +352,6 @@
                     scene.getTransformMatrix(),
                     camera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
                 );
-
                 if (pos.z >= 0 && pos.z <= 1) {
                     circle.style.left = `${pos.x}px`;
                     circle.style.top = `${pos.y}px`;
@@ -323,12 +365,15 @@
 
         window.addEventListener("resize", () => engine.resize());
 
-        // === Logique du menu Hamburger ===
         const hamburgerButton = document.getElementById('hamburger-button');
         const menuOverlay = document.getElementById('menu-overlay');
-
         hamburgerButton.addEventListener('click', () => {
             menuOverlay.classList.toggle('open');
+        });
+
+        const customText = document.getElementById("customText");
+        customText.addEventListener("click", () => {
+            customText.classList.toggle("zoomed");
         });
     </script>
 </body>
