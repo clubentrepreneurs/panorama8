@@ -5,6 +5,7 @@
     <title>GLB + cercles + panorama + menu</title>
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
     <link href="https://fonts.cdnfonts.com/css/apex-new" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lottie-web/5.10.2/lottie.min.js"></script>
     <style>
         html, body {
             margin: 0;
@@ -19,6 +20,20 @@
             display: block;
             touch-action: none;
             background-color: transparent !important;
+        }
+
+        /* === Styles pour l'animation Lottie d'introduction === */
+        #lottie-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: white; /* ou la couleur de votre fond */
+            z-index: 9999; /* S'assure qu'il est au-dessus de tout */
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
 
         /* === Texte stylisé avec effet bounce === */
@@ -196,6 +211,7 @@
     </style>
 </head>
 <body>
+    <div id="lottie-container"></div>
     <canvas id="renderCanvas"></canvas>
 
     <div id="customText">
@@ -227,6 +243,23 @@
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script>
+        // Le code Lottie est le premier à s'exécuter
+        document.addEventListener("DOMContentLoaded", () => {
+            const lottieContainer = document.getElementById('lottie-container');
+
+            const anim = lottie.loadAnimation({
+                container: lottieContainer,
+                renderer: 'svg',
+                loop: false,
+                autoplay: true,
+                path: 'panorama4.json' // REMPLACEZ 'intro.json' par le nom de votre fichier JSON
+            });
+
+            anim.addEventListener('complete', () => {
+                lottieContainer.style.display = 'none'; // Cache le conteneur Lottie une fois l'animation terminée
+            });
+        });
+
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: true });
         const scene = new BABYLON.Scene(engine);
@@ -266,7 +299,7 @@
 
         // Choisis ton fichier de base ici
         supportsWebP((isSupported) => {
-            const panoFile = isSupported ? "test7.webp" : "backgroundstatiqueexportepourleweb.png"; 
+            const panoFile = isSupported ? "test7.webp" : "backgroundstatiqueexportepourleweb.png";
             createPhotoDome(panoFile);
         });
 
@@ -294,6 +327,14 @@
             214 * (Math.PI / 180)
         ];
         const radius = 400;
+
+        // Nouvelle liste pour les textes des cercles
+        const circleLabels = [
+            "Bienvenue",
+            "Compte Sésame",
+            "Intranet étudiant",
+            "Étudier à la BU"
+        ];
 
         const videoContainer = document.getElementById("videoContainer");
         const videoPlayer = document.getElementById("videoPlayer");
@@ -323,7 +364,8 @@
                 }
                 mesh.parent = pivot;
 
-                const circle = createCircle(index + 1, file);
+                // On utilise le nouveau tableau `circleLabels` pour le texte
+                const circle = createCircle(index + 1, circleLabels[index]);
                 circleMap.set(mesh, circle);
 
                 circle.addEventListener('click', () => {
