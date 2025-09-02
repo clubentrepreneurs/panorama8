@@ -252,7 +252,10 @@
                 renderer: 'svg',
                 loop: false,
                 autoplay: true,
-                path: 'intro.json' // REMPLACEZ 'intro.json' par le nom de votre fichier JSON
+                path: 'intro.json', // REMPLACEZ 'intro.json' par le nom de votre fichier JSON
+                rendererSettings: {
+                    preserveAspectRatio: 'xMidYMid slice' // L'option clé pour supprimer les bandes blanches
+                }
             });
 
             anim.addEventListener('complete', () => {
