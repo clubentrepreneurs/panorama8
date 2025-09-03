@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -35,6 +34,12 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            /* AJOUT : Transition pour l'opacité */
+            transition: opacity 1s ease-in-out;
+        }
+        /* AJOUT : Classe pour le fondu */
+        #lottie-container.fade-out {
+            opacity: 0;
         }
 
         /* === Texte stylisé avec effet bounce === */
@@ -260,7 +265,13 @@
             });
 
             anim.addEventListener('complete', () => {
-                lottieContainer.style.display = 'none'; // Cache le conteneur Lottie une fois l'animation terminée
+                // MODIFICATION : Déclenche le fondu enchaîné en ajoutant la classe
+                lottieContainer.classList.add('fade-out');
+
+                // MODIFICATION : Attend la fin de la transition avant de masquer
+                setTimeout(() => {
+                    lottieContainer.style.display = 'none';
+                }, 1000); // La durée doit correspondre à la transition CSS
             });
         });
 
