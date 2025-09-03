@@ -34,10 +34,8 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            /* AJOUT : Transition pour l'opacité */
             transition: opacity 1s ease-in-out;
         }
-        /* AJOUT : Classe pour le fondu */
         #lottie-container.fade-out {
             opacity: 0;
         }
@@ -249,40 +247,16 @@
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script>
-        // Le code Lottie est le premier à s'exécuter
-        document.addEventListener("DOMContentLoaded", () => {
-            const lottieContainer = document.getElementById('lottie-container');
-
-            const anim = lottie.loadAnimation({
-                container: lottieContainer,
-                renderer: 'svg',
-                loop: false,
-                autoplay: true,
-                path: 'intro.json', // REMPLACEZ 'intro.json' par le nom de votre fichier JSON
-                rendererSettings: {
-                    preserveAspectRatio: 'xMidYMid slice' // L'option clé pour supprimer les bandes blanches
-                }
-            });
-
-            anim.addEventListener('complete', () => {
-                // MODIFICATION : Déclenche le fondu enchaîné en ajoutant la classe
-                lottieContainer.classList.add('fade-out');
-
-                // MODIFICATION : Attend la fin de la transition avant de masquer
-                setTimeout(() => {
-                    lottieContainer.style.display = 'none';
-                }, 1000); // La durée doit correspondre à la transition CSS
-            });
-        });
-
         const canvas = document.getElementById("renderCanvas");
         const engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true, alpha: true });
         const scene = new BABYLON.Scene(engine);
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
+        // La caméra sera initialisée avec une rotation "pré-tournée"
         const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/2.5, 300, new BABYLON.Vector3(0,0,0), scene);
         camera.attachControl(canvas, true);
-
+        camera.inputs.clear(); // Désactiver temporairement les contrôles pour l'animation
+        
         new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0,1,0), scene);
 
         // === Support WebP + fallback + gestion PNG/JPG ===
@@ -343,7 +317,6 @@
         ];
         const radius = 400;
 
-        // Nouvelle liste pour les textes des cercles
         const circleLabels = [
             "Bienvenue",
             "Compte Sésame",
@@ -379,7 +352,6 @@
                 }
                 mesh.parent = pivot;
 
-                // On utilise le nouveau tableau `circleLabels` pour le texte
                 const circle = createCircle(index + 1, circleLabels[index]);
                 circleMap.set(mesh, circle);
 
@@ -432,6 +404,74 @@
         customText.addEventListener("click", () => {
             customText.classList.toggle("zoomed");
         });
+
+        // Le code Lottie est le premier à s'exécuter
+        document.addEventListener("DOMContentLoaded", () => {
+            const lottieContainer = document.getElementById('lottie-container');
+
+            const anim = lottie.loadAnimation({
+                container: lottieContainer,
+                renderer: 'svg',
+                loop: false,
+                autoplay: true,
+                path: 'intro.json', // REMPLACEZ 'intro.json' par le nom de votre fichier JSON
+                rendererSettings: {
+                    preserveAspectRatio: 'xMidYMid slice'
+                }
+            });
+
+            anim.addEventListener('complete', () => {
+                lottieContainer.classList.add('fade-out');
+
+                // MODIFICATION : Appel de la fonction d'animation de la caméra après le fondu
+                setTimeout(() => {
+                    lottieContainer.style.display = 'none';
+                    animateCameraSpin(); // Déclenche l'animation de la caméra ici
+                }, 1000);
+            });
+        });
+
+        // NOUVELLE FONCTION : Anime la caméra pour créer l'effet tournoyant
+        function animateCameraSpin() {
+            // Définir la position initiale de la caméra (un peu en arrière pour l'effet)
+            camera.alpha -= Math.PI * 0.75; // Commence avec un décalage de rotation
+            camera.beta = Math.PI / 2.5; // Hauteur de la caméra
+            camera.radius = 300; // Distance par rapport au centre
+
+            // Créer une animation pour la rotation alpha (horizontal) de la caméra
+            BABYLON.Animation.CreateAndStartAnimation(
+                "cameraSpin", // Nom de l'animation
+                camera,       // Cible de l'animation
+                "alpha",      // Propriété à animer
+                60,           // Images par seconde
+                120,          // Nombre total d'images (2 secondes à 60 fps)
+                camera.alpha, // Valeur de départ (rotation décalée)
+                camera.alpha + Math.PI * 0.75, // Valeur d'arrivée (retour à la position normale)
+                BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT, // Une seule fois
+                new BABYLON.CubicEase() // Type d'accélération pour un mouvement fluide
+            );
+
+            // Optionnel : Animer légèrement le zoom si vous voulez un effet d'approche
+            BABYLON.Animation.CreateAndStartAnimation(
+                "cameraZoom",
+                camera,
+                "radius",
+                60,
+                120,
+                camera.radius * 1.2, // Commence un peu plus loin
+                camera.radius,       // Revient à la distance normale
+                BABYLON.Animation.ANIMATIONLOOPMODE_CONSTANT,
+                new BABYLON.CubicEase()
+            );
+
+            // Rattache les contrôles de la caméra une fois l'animation terminée
+            setTimeout(() => {
+                camera.attachControl(canvas, true);
+                // Si vous aviez désactivé les inputs, réactivez-les
+                camera.inputs.add(new BABYLON.ArcRotateCameraPointersInput());
+                camera.inputs.add(new BABYLON.ArcRotateCameraKeyboardInput());
+            }, 2000); // Doit correspondre à la durée de l'animation (120 images / 60 fps = 2 secondes)
+        }
     </script>
 </body>
 </html>
