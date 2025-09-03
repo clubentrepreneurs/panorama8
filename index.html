@@ -22,6 +22,11 @@
             background-color: transparent !important;
         }
 
+        /* AJOUT : Le canvas est caché au début pour éviter un flash */
+        #renderCanvas.hidden {
+            visibility: hidden;
+        }
+
         /* === Styles pour l'animation Lottie d'introduction === */
         #lottie-container {
             position: fixed;
@@ -38,6 +43,8 @@
         }
         #lottie-container.fade-out {
             opacity: 0;
+            /* Empêche les interactions pendant le fade-out */
+            pointer-events: none;
         }
 
         /* === Texte stylisé avec effet bounce === */
@@ -216,9 +223,7 @@
 </head>
 <body>
     <div id="lottie-container"></div>
-    <canvas id="renderCanvas"></canvas>
-
-    <div id="customText">
+    <canvas id="renderCanvas" class="hidden"></canvas> <div id="customText">
         <br>
         
     </div>
@@ -252,12 +257,13 @@
         const scene = new BABYLON.Scene(engine);
         scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
-        // La caméra sera initialisée avec une rotation "pré-tournée"
         const camera = new BABYLON.ArcRotateCamera("cam", Math.PI/2, Math.PI/2.5, 300, new BABYLON.Vector3(0,0,0), scene);
         camera.attachControl(canvas, true);
         camera.inputs.clear(); // Désactiver temporairement les contrôles pour l'animation
         
         new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0,1,0), scene);
+
+        let panoLoaded = false; // Variable pour suivre le chargement du panorama
 
         // === Support WebP + fallback + gestion PNG/JPG ===
         function supportsWebP(callback) {
@@ -270,6 +276,13 @@
         function createPhotoDome(panoFile) {
             const dome = new BABYLON.PhotoDome("panorama", panoFile + "?v=" + Date.now(), { resolution: 32, size: 1000 }, scene);
             dome.imageMode = BABYLON.PhotoDome.MODE_MONOSCOPIC;
+
+            // Une fois que l'image du dôme est prête, marquer le panorama comme chargé
+            dome.onReady = () => {
+                panoLoaded = true;
+                // Si le Lottie est déjà terminé ou en train de se terminer, on peut démarrer la suite.
+                checkAndStartPanoramaIntro();
+            };
 
             const domeMat = dome.mesh.material;
 
@@ -286,7 +299,20 @@
             }
         }
 
-        // Choisis ton fichier de base ici
+        // Variable pour suivre l'état de l'animation Lottie
+        let lottieAnimationComplete = false; 
+
+        // Fonction pour vérifier si tout est prêt et démarrer l'intro du panorama
+        function checkAndStartPanoramaIntro() {
+            if (panoLoaded && lottieAnimationComplete) {
+                // Rendre le canvas visible juste avant l'animation de la caméra
+                canvas.classList.remove('hidden');
+                animateCameraSpin();
+            }
+        }
+
+        // Placez la logique de chargement du panorama au début
+        // pour qu'il commence à charger dès que possible
         supportsWebP((isSupported) => {
             const panoFile = isSupported ? "test7.webp" : "backgroundstatiqueexportepourleweb3.png";
             createPhotoDome(panoFile);
@@ -421,13 +447,17 @@
             });
 
             anim.addEventListener('complete', () => {
-                lottieContainer.classList.add('fade-out');
-
-                // MODIFICATION : Appel de la fonction d'animation de la caméra après le fondu
+                lottieAnimationComplete = true; // Marquer le Lottie comme terminé
+                lottieContainer.classList.add('fade-out'); // Déclencher le fondu CSS
+                
+                // Le `setTimeout` reste pour masquer complètement le conteneur Lottie
+                // mais le déclenchement de l'animation de caméra est déplacé.
                 setTimeout(() => {
                     lottieContainer.style.display = 'none';
-                    animateCameraSpin(); // Déclenche l'animation de la caméra ici
-                }, 1000);
+                }, 1000); 
+
+                // Immédiatement vérifier et démarrer l'animation si le panorama est prêt
+                checkAndStartPanoramaIntro();
             });
         });
 
@@ -467,7 +497,6 @@
             // Rattache les contrôles de la caméra une fois l'animation terminée
             setTimeout(() => {
                 camera.attachControl(canvas, true);
-                // Si vous aviez désactivé les inputs, réactivez-les
                 camera.inputs.add(new BABYLON.ArcRotateCameraPointersInput());
                 camera.inputs.add(new BABYLON.ArcRotateCameraKeyboardInput());
             }, 2000); // Doit correspondre à la durée de l'animation (120 images / 60 fps = 2 secondes)
